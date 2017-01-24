@@ -1,0 +1,9 @@
+Changes
+MANIFEST
+Makefile.PL
+README.md
+README.pod
+lib/JSON/Schema/ToJSON.pm
+t/001_compiles_pod.t
+t/003_changes.t
+t/005_simple.t
