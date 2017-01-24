@@ -156,6 +156,22 @@ sub _add_next_array_item {
 	return 0;
 }
 
+sub _random_object {
+	my ( $self,$schema ) = @_;
+
+	my $object = {};
+
+	foreach my $property ( keys( %{ $schema->{properties} } ) ) {
+
+		# and we recurse, simple!
+		$object->{$property} = $self->json_schema_to_json(
+			schema => $schema->{properties}{$property},
+		);
+	}
+
+	return $object;
+}
+
 sub _guess_method {
 	my ( $self,$schema ) = @_;
 
