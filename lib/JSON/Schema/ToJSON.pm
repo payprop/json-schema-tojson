@@ -7,8 +7,6 @@ use Cpanel::JSON::XS;
 use JSON::Validator;
 use String::Random;
 
-use Exporter 'import';
-our @EXPORT  = 'json_schema_to_json';
 our $VERSION = '0.01_01';
 
 sub new { bless( {},$_[0] ) }
