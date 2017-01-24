@@ -14,6 +14,7 @@ WriteMakefile(
     PREREQ_PM => {
         'Cpanel::JSON::XS' => 0,
         'JSON::Validator'  => 0,
+        'String::Random'   => 0,
     },
     TEST_REQUIRES => {
         'Test::Most'       => 0.31,

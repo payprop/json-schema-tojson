@@ -5,6 +5,7 @@ use warnings;
 
 use Cpanel::JSON::XS;
 use JSON::Validator;
+use String::Random;
 
 use Exporter 'import';
 our @EXPORT  = 'json_schema_to_json';
@@ -25,9 +26,7 @@ sub json_schema_to_json {
 		or do { die "json_schema_to_json failed to parse schema: $@" };
 	}
 
-	my $schema_type = JSON::Validator::_guess_schema_type( $schema );
-	my $method      = "_random_$schema_type";
-
+	my $method = $self->_guess_method( $schema );
 	return $self->$method( $schema );
 }
 
@@ -56,17 +55,112 @@ sub _random_integer {
 			? $min .. $min + ( $min * $min )
 			: defined $max
 				? ( $max * $max ) .. $max 
-				: 0 .. 2147483647;
+				: defined $mof
+					? $mof .. $mof
+					: 1 .. 1000 # short range, prevent creation of a massive array
+	;
 
 	# if we have multipleOf just return the first value that fits. note that
 	# there is a possible bug here and the JSON schema spec isn't clear about
 	# it - it's possible to have a multipleOf that would never be possible
-	# given certain minimum and maximum
+	# given certain minimum and maximum (e.g. 1 .. 3, multiple of 4)
 	if ( $mof ) {
-
+		shift( @possible_values ) until (
+			! @possible_values
+			|| $possible_values[0] % $mof == 0
+		);
+		return $possible_values[0];
 	} else {
-		return $possible_values[ int( rand( $#possible_values ) ) ];
+		return $possible_values[ int( rand( $#possible_values + 1 ) ) ];
 	}
+}
+
+sub _random_number {
+	return _random_integer( @_ );
+}
+
+sub _random_string {
+	my ( $self,$schema ) = @_;
+
+	if ( my @enum = @{ $schema->{enum} // [] } ) {
+		return $enum[ int( rand( $#enum + 1 ) ) ];
+	}
+
+	return String::Random->new->randregex( $schema->{pattern} )
+		if $schema->{pattern};
+
+	my $min = $schema->{minLength} || 10;
+	my $max = $schema->{maxLength} || 50;
+
+	return String::Random->new->randpattern(
+		'.' x $self->_random_integer( { minimum => $min, maximum => $max } ),
+	);
+}
+
+sub _random_array {
+	my ( $self,$schema ) = @_;
+
+	my $unique = $schema->{uniqueItems};
+
+	my $length = $self->_random_integer({
+		minimum => $schema->{minItems} || 0,
+		maximum => $schema->{maxItems} || 5,
+	});
+
+	my @return_items;
+
+	if ( my $items = $schema->{items} ) {
+
+		if ( ref( $items ) eq 'ARRAY' ) {
+
+			ADD_ITEM: foreach my $item ( @{ $items } ) {
+				$self->_add_next_array_item( \@return_items,$item,$unique )
+					|| redo ADD_ITEM; # possible halting problem
+			}
+
+		} else {
+
+			ADD_ITEM: foreach my $i ( 1 .. $length ) {
+				$self->_add_next_array_item( \@return_items,$items,$unique )
+					|| redo ADD_ITEM; # possible halting problem
+			}
+
+		}
+	} else {
+		@return_items = 1 .. $length;
+	}
+
+	return [ @return_items ];
+}
+
+sub _add_next_array_item {
+	my ( $self,$array,$schema,$unique ) = @_;
+
+	my $method = $self->_guess_method( $schema );
+	my $value = $self->$method( $schema );
+
+	if ( ! $unique ) {
+		push( @{ $array },$value );
+		return 1;
+	}
+
+	# unique requires us to check all existing elements of the array and only
+	# add the new value if it doesn't already exist
+	my %existing = map { $_ => 1 } @{ $array };
+
+	if ( ! $existing{$value} ) {
+		push( @{ $array },$value );
+		return 1;
+	}
+
+	return 0;
+}
+
+sub _guess_method {
+	my ( $self,$schema ) = @_;
+
+	my $schema_type = JSON::Validator::_guess_schema_type( $schema );
+	return "_random_$schema_type";
 }
 
 =encoding utf8
