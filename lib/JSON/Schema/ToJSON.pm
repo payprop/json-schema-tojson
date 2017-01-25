@@ -11,6 +11,8 @@ our $VERSION = '0.01_01';
 
 sub new { bless( {},$_[0] ) }
 
+my $_top_level_schema;
+
 sub json_schema_to_json {
 	my ( $self,%args ) = @_;
 
@@ -23,6 +25,8 @@ sub json_schema_to_json {
 		eval { $schema = decode_json( $schema ); }
 		or do { die "json_schema_to_json failed to parse schema: $@" };
 	}
+
+	$_top_level_schema //= $schema;
 
 	my $method = $self->_guess_method( $schema );
 	return $self->$method( $schema );
@@ -101,7 +105,7 @@ sub _random_array {
 	my $unique = $schema->{uniqueItems};
 
 	my $length = $self->_random_integer({
-		minimum => $schema->{minItems} || 0,
+		minimum => $schema->{minItems} || 1,
 		maximum => $schema->{maxItems} || 5,
 	});
 
@@ -159,6 +163,10 @@ sub _random_object {
 
 	my $object = {};
 
+	if ( my $ref = $schema->{'$ref'} ) {
+		$schema = $self->_expand_ref( $ref );
+	}
+
 	foreach my $property ( keys( %{ $schema->{properties} } ) ) {
 
 		# and we recurse, simple!
@@ -170,9 +178,44 @@ sub _random_object {
 	return $object;
 }
 
+sub _expand_ref {
+	my ( $self,$ref ) = @_;
+
+	# resolve reference to actual type definition. TODO: this is probably
+	# wrong, or doesn't cover edge cases so add more test cases and fix.
+	# may be able to delegate some or all of this to JSON::Validator
+	my @path     = split( '/',$ref );
+	my $ref_type = shift( @path );
+	my $schema;
+
+	if ( $ref_type eq '#' ) {
+
+		# self reference, so use the top level schema definition as start point
+		$schema = $_top_level_schema;
+		foreach my $path ( @path ) {
+			$schema = $schema->{$path}
+				|| die "[JSON::Schema::ToJSON] Failed to resolve $ref";
+		}
+	} else {
+		# something else
+		die "[JSON::Schema::ToJSON] Can't resolve $ref_type references (yet)";
+	}
+
+	return $schema;
+}
+
 sub _guess_method {
 	my ( $self,$schema ) = @_;
 
+	if ( my $ref = $schema->{'$ref'} ) {
+		$schema = $self->_expand_ref( $ref );
+	}
+
+	if ( ref( $schema->{'type'} ) eq 'ARRAY' ) {
+		$schema->{'type'} = $schema->{'type'}->[0];
+	}
+
+	# danger danger! accessing private method from elsewhere
 	my $schema_type = JSON::Validator::_guess_schema_type( $schema );
 	return "_random_$schema_type";
 }
@@ -204,6 +247,21 @@ L<JSON::Schema::ToJSON> is a class for generating "fake" or "example" JSON data
 structures from JSON Schema structures.
 
 Note this distribution is currently B<EXPERIMENTAL> and subject to breaking changes.
+
+=head1 BUGS, CAVEATS, AND GOTCHAS
+
+Bugs? Almost certainly.
+
+Caveats? The implementation is currently incomplete, this is a work in progress so
+using some of the more edge case JSON schema options (oneOf, formats, required, not,
+etc) will not generate representative JSON so they will not validate against the
+schema on a round trip.
+
+Gotchas? The data generated is completely random, don't expect it to be the same
+across runs or calls. The data is also meaningless in terms of what it represents
+such that an object property of "name" that is a string will be generated as, for
+example, "kj02@#fjs01je#$42wfjs" - The JSON generated is so you have a representative
+B<structure>, not representative B<data>.
 
 =head1 LICENSE
 
