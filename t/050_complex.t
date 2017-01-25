@@ -18,8 +18,10 @@ my $json = $ToJSON->json_schema_to_json(
     schema => {
 		# as the "schema" below is an OpenAPI spec we need to set something
 		# at the top level to force some JSON to be created as there is no
-		# $ref or type key at the top level of an OpenAPI spec
-        '$ref' => "#/definitions/PropertyPortfolio",
+		# $ref or type key at the top level of an OpenAPI spec - this is
+		# purely for testing purposes (and to check refs resolve)
+        type => 'object',
+		schema => { '$ref' => "#/definitions/PropertyPortfolio" },
 		%{ $schema },
 	},
 );

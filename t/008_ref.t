@@ -43,7 +43,7 @@ eval {
 
 like(
 	$@,
-	qr!\Q[JSON::Schema::ToJSON] Failed to resolve #/definitions/doesNotExist\E!,
+	qr!Could not find "#/definitions/doesNotExist!,
 	'die on bad $ref',
 );
 
@@ -64,8 +64,8 @@ eval {
 
 like(
 	$@,
-	qr/\Q[JSON::Schema::ToJSON] Can't resolve .. references (yet)\E/,
-	'die on unknown $ref types'
+	qr!Could not load document!,
+	'die on bad file $ref'
 );
 
 done_testing();

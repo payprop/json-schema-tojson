@@ -3,15 +3,15 @@ package JSON::Schema::ToJSON;
 use strict;
 use warnings;
 
+use Mojo::Base -base;
 use Cpanel::JSON::XS;
 use JSON::Validator;
 use String::Random;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
-sub new { bless( {},$_[0] ) }
-
-my $_top_level_schema;
+has _validator => sub { JSON::Validator->new };
+has _str_rand  => sub { String::Random->new };
 
 sub json_schema_to_json {
 	my ( $self,%args ) = @_;
@@ -19,14 +19,15 @@ sub json_schema_to_json {
 	my $schema = $args{schema}; # an already parsed JSON schema
 
 	if ( ! $schema ) {
-		$schema = $args{schema_str} # an uparsed JSON schema
+		$schema = $args{schema_str} # an unparsed JSON schema
 			|| die "json_schema_to_json needs schema or schema_str arg";
 
 		eval { $schema = decode_json( $schema ); }
 		or do { die "json_schema_to_json failed to parse schema: $@" };
 	}
 
-	$_top_level_schema //= $schema;
+	$self->_validator->schema( $schema );
+	$schema = $self->_validator->schema->data;
 
 	my $method = $self->_guess_method( $schema );
 	return $self->$method( $schema );
@@ -88,13 +89,13 @@ sub _random_string {
 		return $enum[ int( rand( $#enum + 1 ) ) ];
 	}
 
-	return String::Random->new->randregex( $schema->{pattern} )
+	return $self->_str_rand->randregex( $schema->{pattern} )
 		if $schema->{pattern};
 
 	my $min = $schema->{minLength} || 10;
 	my $max = $schema->{maxLength} || 50;
 
-	return String::Random->new->randpattern(
+	return $self->_str_rand->randpattern(
 		'.' x $self->_random_integer( { minimum => $min, maximum => $max } ),
 	);
 }
@@ -163,53 +164,17 @@ sub _random_object {
 
 	my $object = {};
 
-	if ( my $ref = $schema->{'$ref'} ) {
-		$schema = $self->_expand_ref( $ref );
-	}
-
 	foreach my $property ( keys( %{ $schema->{properties} } ) ) {
 
-		# and we recurse, simple!
-		$object->{$property} = $self->json_schema_to_json(
-			schema => $schema->{properties}{$property},
-		);
+		my $method = $self->_guess_method( $schema->{properties}{$property} );
+		$object->{$property} = $self->$method( $schema->{properties}{$property} );
 	}
 
 	return $object;
 }
 
-sub _expand_ref {
-	my ( $self,$ref ) = @_;
-
-	# resolve reference to actual type definition. TODO: this is probably
-	# wrong, or doesn't cover edge cases so add more test cases and fix.
-	# may be able to delegate some or all of this to JSON::Validator
-	my @path     = split( '/',$ref );
-	my $ref_type = shift( @path );
-	my $schema;
-
-	if ( $ref_type eq '#' ) {
-
-		# self reference, so use the top level schema definition as start point
-		$schema = $_top_level_schema;
-		foreach my $path ( @path ) {
-			$schema = $schema->{$path}
-				|| die "[JSON::Schema::ToJSON] Failed to resolve $ref";
-		}
-	} else {
-		# something else
-		die "[JSON::Schema::ToJSON] Can't resolve $ref_type references (yet)";
-	}
-
-	return $schema;
-}
-
 sub _guess_method {
 	my ( $self,$schema ) = @_;
-
-	if ( my $ref = $schema->{'$ref'} ) {
-		$schema = $self->_expand_ref( $ref );
-	}
 
 	if ( ref( $schema->{'type'} ) eq 'ARRAY' ) {
 		$schema->{'type'} = $schema->{'type'}->[0];
@@ -228,7 +193,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.01
+0.02
 
 =head1 SYNOPSIS
 
