@@ -32,7 +32,7 @@ $json = $ToJSON->json_schema_to_json(
 cmp_deeply(
 	$json,
 	[
-		re( '^\d+\.\d+$' ),
+		re( '^\d+' ),
 		re( '.+' ),
 		re( '^(Street|Avenue|Boulevard)$' ),
 		re( '^(NW|NE|SW|SE)$' ),
