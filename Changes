@@ -1,5 +1,8 @@
 Revision history for JSON-Schema-ToJSON
 
+0.03  2017-01-26
+        - Add example_key attribute
+
 0.02  2017-01-25
         - Fix resolving of all $ref by delegating to JSON::Validator
 

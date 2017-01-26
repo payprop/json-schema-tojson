@@ -8,7 +8,7 @@ use Cpanel::JSON::XS;
 use JSON::Validator;
 use String::Random;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 has _validator  => sub { JSON::Validator->new };
 has _str_rand   => sub { String::Random->new };
@@ -222,7 +222,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.02
+0.03
 
 =head1 SYNOPSIS
 
