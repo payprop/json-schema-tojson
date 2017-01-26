@@ -78,7 +78,7 @@ sub _random_integer {
 		: defined $min
 			? $min .. $min + ( $min * $min )
 			: defined $max
-				? ( $max * $max ) .. $max 
+				? 1 .. $max
 				: defined $mof
 					? $mof .. $mof
 					: 1 .. 1000 # short range, prevent creation of a massive array
@@ -121,8 +121,11 @@ sub _random_string {
 	return $self->_str_rand->randregex( $schema->{pattern} )
 		if $schema->{pattern};
 
-	my $min = $schema->{minLength} || 10;
-	my $max = $schema->{maxLength} || 50;
+	my $min = $schema->{minLength}
+		|| ( $schema->{maxLength} ? $schema->{maxLength} - 1 : 10 );
+
+	my $max = $schema->{maxLength}
+		|| ( $schema->{minLength} ? $schema->{minLength} + 1 : 50 );
 
 	return $self->_str_rand->randpattern(
 		'.' x $self->_random_integer( { minimum => $min, maximum => $max } ),
@@ -135,8 +138,10 @@ sub _random_array {
 	my $unique = $schema->{uniqueItems};
 
 	my $length = $self->_random_integer({
-		minimum => $schema->{minItems} || 1,
-		maximum => $schema->{maxItems} || 5,
+		minimum => $schema->{minItems}
+			|| ( $schema->{maxItems} ? $schema->{maxItems} - 1 : 1 ),
+		maximum => $schema->{maxItems}
+			|| ( $schema->{minItems} ? $schema->{minItems} + 1 : 5 )
 	});
 
 	my @return_items;
@@ -192,8 +197,53 @@ sub _random_object {
 	my ( $self,$schema ) = @_;
 
 	my $object = {};
+	my $required;
+	my %properties = map { $_ => 1 } keys( %{ $schema->{properties} } );
 
-	foreach my $property ( keys( %{ $schema->{properties} } ) ) {
+	if ( $required = $schema->{required} ) {
+		# we have a list of required properties, just use those
+		%properties = map { $_ => 1 } @{ $required };
+	}
+
+	# check max/min properties requirements
+	my $min = $schema->{minProperties}
+		|| ( $schema->{maxProperties} ? $schema->{maxProperties} - 1 : undef );
+
+	my $max = $schema->{maxProperties}
+		|| ( $schema->{minProperties} ? $schema->{minProperties} + 1 : undef );
+
+	if ( $min && scalar( keys( %properties ) ) < $min ) {
+		# we have too few properties
+		if ( $max ) {
+			# add more properties until we have enough
+			MAX_PROP: foreach my $property ( keys( %{ $schema->{properties} } ) ) {
+				$properties{$property} = 1;
+				last MAX_PROP if scalar( keys( %properties ) ) == $min;
+			}
+		} else {
+			# no max, just make use of all properties
+			%properties = map { $_ => 1 } keys( %{ $schema->{properties} } );
+		}
+	}
+
+	if ( $max && scalar( keys( %properties ) ) > $max ) {
+		# we have too many properties, delete some (except those required)
+		# until we are below the max permitted amount
+		MIN_PROP: foreach my $property ( keys( %{ $schema->{properties} } ) ) {
+
+			delete( $properties{$property} ) if (
+				# we can delete, we don't have any required properties
+				! $required
+
+				# or this property is not amongst the list of required properties
+				|| ! grep { $_ eq $property } @{ $required }
+			);
+
+			last MIN_PROP if scalar( keys( %properties ) ) <= $max;
+		}
+	}
+
+	foreach my $property ( keys %properties ) {
 
 		my $method = $self->_guess_method( $schema->{properties}{$property} );
 		$object->{$property} = $self->$method( $schema->{properties}{$property} );
@@ -202,15 +252,19 @@ sub _random_object {
 	return $object;
 }
 
+sub _random_null { undef }
+
 sub _guess_method {
 	my ( $self,$schema ) = @_;
 
 	if ( ref( $schema->{'type'} ) eq 'ARRAY' ) {
-		$schema->{'type'} = $schema->{'type'}->[0];
+		$schema->{'type'} = $schema->{'type'}->[
+			int( rand( scalar( @{ $schema->{'type'} } ) ) )
+		];
 	}
 
 	# danger danger! accessing private method from elsewhere
-	my $schema_type = JSON::Validator::_guess_schema_type( $schema );
+	my $schema_type = JSON::Validator::_guess_schema_type( $schema ) // 'null';
 	return "_random_$schema_type";
 }
 
@@ -288,9 +342,24 @@ Schema string.
 Bugs? Almost certainly.
 
 Caveats? The implementation is currently incomplete, this is a work in progress so
-using some of the more edge case JSON schema options (oneOf, formats, required, not,
-etc) will not generate representative JSON so they will not validate against the
-schema on a round trip.
+using some of the more edge case JSON schema validation options will not generate
+representative JSON so they will not validate against the schema on a round trip.
+These include:
+
+    additionalItems
+    patternProperties
+    additionalProperties
+    dependencies
+    allOf
+    anyOf
+    oneOf
+    not
+
+It is also entirely possible to pass a schema that could never be validated, but
+will result in a generated structure anyway, example: an integer that has a "minimum"
+value of 2, "maximum" value of 4, and must be a "multipleOf" 5 - a nonsensical
+combination. Having an array with "allOf" and "minItems" or "maxItems" would also be
+nonsensical.
 
 Gotchas? The data generated is completely random, don't expect it to be the same
 across runs or calls. The data is also meaningless in terms of what it represents

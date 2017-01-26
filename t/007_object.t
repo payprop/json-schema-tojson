@@ -13,6 +13,7 @@ isa_ok( $ToJSON,'JSON::Schema::ToJSON' );
 my $json = $ToJSON->json_schema_to_json(
 	schema => {
 		"type" => "object",
+		"required" => [ "id","name","address" ],
 		"properties" => {
 			"id" => {
 				"type" => "integer",
