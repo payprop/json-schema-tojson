@@ -1,5 +1,8 @@
 Revision history for JSON-Schema-ToJSON
 
+0.05  2017-01-26
+        - Fix perldoc
+
 0.04  2017-01-26
         - Add support for formats in string generation
         - Fix some sizing/length edge cases

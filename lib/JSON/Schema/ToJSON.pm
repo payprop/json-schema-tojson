@@ -9,7 +9,7 @@ use JSON::Validator;
 use String::Random;
 use DateTime;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 has _validator  => sub { JSON::Validator->new };
 has _str_rand   => sub { String::Random->new };
@@ -296,7 +296,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.04
+0.05
 
 =head1 SYNOPSIS
 
@@ -378,8 +378,7 @@ These include:
 It is also entirely possible to pass a schema that could never be validated, but
 will result in a generated structure anyway, example: an integer that has a "minimum"
 value of 2, "maximum" value of 4, and must be a "multipleOf" 5 - a nonsensical
-combination. Having an array with "allOf" and "minItems" or "maxItems" would also be
-nonsensical.
+combination.
 
 Gotchas? The data generated is completely random, don't expect it to be the same
 across runs or calls. The data is also meaningless in terms of what it represents

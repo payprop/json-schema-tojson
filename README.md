@@ -4,7 +4,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 # VERSION
 
-0.04
+0.05
 
 # SYNOPSIS
 
@@ -86,8 +86,7 @@ These include:
 It is also entirely possible to pass a schema that could never be validated, but
 will result in a generated structure anyway, example: an integer that has a "minimum"
 value of 2, "maximum" value of 4, and must be a "multipleOf" 5 - a nonsensical
-combination. Having an array with "allOf" and "minItems" or "maxItems" would also be
-nonsensical.
+combination.
 
 Gotchas? The data generated is completely random, don't expect it to be the same
 across runs or calls. The data is also meaningless in terms of what it represents
