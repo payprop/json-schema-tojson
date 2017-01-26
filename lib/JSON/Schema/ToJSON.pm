@@ -10,8 +10,10 @@ use String::Random;
 
 our $VERSION = '0.02';
 
-has _validator => sub { JSON::Validator->new };
-has _str_rand  => sub { String::Random->new };
+has _validator  => sub { JSON::Validator->new };
+has _str_rand   => sub { String::Random->new };
+
+has example_key => sub { 0 };
 
 sub json_schema_to_json {
 	my ( $self,%args ) = @_;
@@ -26,6 +28,8 @@ sub json_schema_to_json {
 		or do { die "json_schema_to_json failed to parse schema: $@" };
 	}
 
+	$self->example_key( $args{example_key} ) if $args{example_key};
+
 	$self->_validator->schema( $schema );
 	$schema = $self->_validator->schema->data;
 
@@ -33,8 +37,22 @@ sub json_schema_to_json {
 	return $self->$method( $schema );
 }
 
+sub _example_from_spec {
+	my ( $self,$schema ) = @_;
+
+	# spec/schema can contain examples that we could use as mock data
+
+	return $schema->{ $self->example_key } # OpenAPI specific
+		if $self->example_key && $schema->{ $self->example_key };
+
+	return ();
+}
+
 sub _random_boolean {
 	my ( $self,$schema ) = @_;
+
+	return $self->_example_from_spec( $schema )
+		if scalar $self->_example_from_spec( $schema );
 
 	return rand > 0.5
 		? Cpanel::JSON::XS::true
@@ -43,6 +61,9 @@ sub _random_boolean {
 
 sub _random_integer {
 	my ( $self,$schema ) = @_;
+
+	return $self->_example_from_spec( $schema )
+		if scalar $self->_example_from_spec( $schema );
 
 	my $min = $schema->{minimum};
 	my $max = $schema->{maximum};
@@ -79,11 +100,19 @@ sub _random_integer {
 }
 
 sub _random_number {
-	return _random_integer( @_ ) + _random_integer( @_ ) / 10;
+	my ( $self,$schema ) = @_;
+
+	return $self->_example_from_spec( $schema )
+		if scalar $self->_example_from_spec( $schema );
+
+	return $self->_random_integer( $schema ) + $self->_random_integer( $schema ) / 10;
 }
 
 sub _random_string {
 	my ( $self,$schema ) = @_;
+
+	return $self->_example_from_spec( $schema )
+		if scalar $self->_example_from_spec( $schema );
 
 	if ( my @enum = @{ $schema->{enum} // [] } ) {
 		return $enum[ int( rand( $#enum + 1 ) ) ];
@@ -197,14 +226,16 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 SYNOPSIS
 
-  use JSON::Schema::ToJSON;
+    use JSON::Schema::ToJSON;
 
-  my $to_json  = JSON::Schema::ToJSON->new;
+    my $to_json  = JSON::Schema::ToJSON->new(
+        example_key => undef, # set to a key to take example from
+    );
 
-  my $perl_string_hash_or_arrayref = $to_json->json_schema_to_json(
-    schema     => $already_parsed_json_schema,  # either this
-    schema_str => '{ "type" : "boolean" }',     # or this
-  );
+    my $perl_string_hash_or_arrayref = $to_json->json_schema_to_json(
+        schema     => $already_parsed_json_schema,  # either this
+        schema_str => '{ "type" : "boolean" }',     # or this
+    );
 
 =head1 DESCRIPTION
 
@@ -212,6 +243,45 @@ L<JSON::Schema::ToJSON> is a class for generating "fake" or "example" JSON data
 structures from JSON Schema structures.
 
 Note this distribution is currently B<EXPERIMENTAL> and subject to breaking changes.
+
+=head1 CONSTRUCTOR ARGUMENTS
+
+=head2 example_key
+
+The key that will be used to find example data for use in the returned structure. In
+the case of the following schema:
+
+    {
+        "type" : "object",
+        "properties" : {
+            "id" : {
+                "type" : "string",
+                "description" : "ID of the payment.",
+                "x-example" : "123ABC"
+            }
+        }
+    }
+
+Setting example_key to C<x-example> will make the generator return the content of
+the C<"x-example"> (123ABC) rather than a random string/int/etc. This is more so
+for things like OpenAPI specifications.
+
+You can set this to any key you like, although be careful as you could end up with
+invalid data being used (for example an integer field and then using the description
+key as the content would not be sensible or valid).
+
+=head1 METHODS
+
+=head2 json_schema_to_json
+
+    my $perl_string_hash_or_arrayref = $to_json->json_schema_to_json(
+        schema     => $already_parsed_json_schema,  # either this
+        schema_str => '{ "type" : "boolean" }',     # or this
+    );
+
+Returns a randomly generated representative data structure that corresponds to the
+passed JSON schema. Can take either an already parsed JSON Schema or the raw JSON
+Schema string.
 
 =head1 BUGS, CAVEATS, AND GOTCHAS
 
@@ -226,7 +296,9 @@ Gotchas? The data generated is completely random, don't expect it to be the same
 across runs or calls. The data is also meaningless in terms of what it represents
 such that an object property of "name" that is a string will be generated as, for
 example, "kj02@#fjs01je#$42wfjs" - The JSON generated is so you have a representative
-B<structure>, not representative B<data>.
+B<structure>, not representative B<data>. Set example keys in your schema and then
+set the C<example_key> in the constructor if you want this to be repeatable and/or
+more representative.
 
 =head1 LICENSE
 

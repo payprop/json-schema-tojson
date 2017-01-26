@@ -15,13 +15,21 @@ isa_ok( $ToJSON,'JSON::Schema::ToJSON' );
 my $schema = decode_json( do { local $/ = undef; <DATA> } );
 
 my $json = $ToJSON->json_schema_to_json(
-    schema => {
+	schema => {
 		# as the "schema" below is an OpenAPI spec we need to set something
 		# at the top level to force some JSON to be created as there is no
-		# $ref or type key at the top level of an OpenAPI spec - this is
-		# purely for testing purposes (and to check refs resolve)
-        type => 'object',
-		schema => { '$ref' => "#/definitions/PropertyPortfolio" },
+		# type key at the top level of an OpenAPI spec - this is purely for
+		# testing purposes (and to check refs resolve)
+		type => 'object',
+		properties => {
+			"items" => {
+				"items" => {
+					'$ref' => "#/definitions/Property"
+				},
+				"description" => "List of Property objects",
+				"type" => "array"
+			}
+		},
 		%{ $schema },
 	},
 );
