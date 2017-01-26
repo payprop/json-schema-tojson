@@ -15,7 +15,8 @@ WriteMakefile(
         'Cpanel::JSON::XS' => 3.0213,
         'JSON::Validator'  => 0.92,
         'String::Random'   => 0.29,
-        'Mojolicious'      => '7.15'
+        'Mojolicious'      => '7.15',
+        'DateTime'         => 0,
     },
     TEST_REQUIRES => {
         'Test::Most'       => 0.31,

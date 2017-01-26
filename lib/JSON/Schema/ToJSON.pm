@@ -7,8 +7,9 @@ use Mojo::Base -base;
 use Cpanel::JSON::XS;
 use JSON::Validator;
 use String::Random;
+use DateTime;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 has _validator  => sub { JSON::Validator->new };
 has _str_rand   => sub { String::Random->new };
@@ -120,6 +121,25 @@ sub _random_string {
 
 	return $self->_str_rand->randregex( $schema->{pattern} )
 		if $schema->{pattern};
+
+	if ( my $format = $schema->{format} ) {
+		return {
+			"date-time" => DateTime->now->iso8601 . '.000Z',
+			"email"     =>
+				$self->_random_string( { pattern => '[A-Za-z]{12}' } )
+				. '@'
+				. $self->_random_string( { pattern => '[A-Za-z]{12}' } )
+				. '.com',
+			"hostname"  => $self->_random_string( { pattern => '[A-Za-z]{12}' } ),
+			"ipv4"      => join( '.',map {  $self->_random_integer({
+				minimum => 1,
+				maximum => 254,
+			}) } 1 .. 4 ),
+			"ipv6"      => '2001:0db8:0000:0000:0000:0000:1428:57ab',
+			"uri"       => 'https://www.google.com',
+			"uriref"    => 'https://www.google.com',
+		}->{ $format };
+	}
 
 	my $min = $schema->{minLength}
 		|| ( $schema->{maxLength} ? $schema->{maxLength} - 1 : 10 );
@@ -276,7 +296,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.03
+0.04
 
 =head1 SYNOPSIS
 

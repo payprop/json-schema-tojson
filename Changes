@@ -1,5 +1,9 @@
 Revision history for JSON-Schema-ToJSON
 
+0.04  2017-01-26
+        - Add support for formats in string generation
+        - Fix some sizing/length edge cases
+
 0.03  2017-01-26
         - Add example_key attribute
 

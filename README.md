@@ -4,7 +4,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 # VERSION
 
-0.03
+0.04
 
 # SYNOPSIS
 
@@ -70,9 +70,24 @@ Schema string.
 Bugs? Almost certainly.
 
 Caveats? The implementation is currently incomplete, this is a work in progress so
-using some of the more edge case JSON schema options (oneOf, formats, required, not,
-etc) will not generate representative JSON so they will not validate against the
-schema on a round trip.
+using some of the more edge case JSON schema validation options will not generate
+representative JSON so they will not validate against the schema on a round trip.
+These include:
+
+    additionalItems
+    patternProperties
+    additionalProperties
+    dependencies
+    allOf
+    anyOf
+    oneOf
+    not
+
+It is also entirely possible to pass a schema that could never be validated, but
+will result in a generated structure anyway, example: an integer that has a "minimum"
+value of 2, "maximum" value of 4, and must be a "multipleOf" 5 - a nonsensical
+combination. Having an array with "allOf" and "minItems" or "maxItems" would also be
+nonsensical.
 
 Gotchas? The data generated is completely random, don't expect it to be the same
 across runs or calls. The data is also meaningless in terms of what it represents
