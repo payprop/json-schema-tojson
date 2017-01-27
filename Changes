@@ -1,5 +1,8 @@
 Revision history for JSON-Schema-ToJSON
 
+0.07  2017-01-27
+        - Fix deep recursion on self referential JSON schemas
+
 0.06  2017-01-27
         - Add support for anyOf, allOf, oneOf, and not (with Caveats, see perldoc)
         - Improve randomness of generated date-time and uri strings

@@ -4,7 +4,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 # VERSION
 
-0.06
+0.07
 
 # SYNOPSIS
 
@@ -12,6 +12,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
     my $to_json  = JSON::Schema::ToJSON->new(
         example_key => undef, # set to a key to take example from
+        max_depth   => 10,    # increase if you have very deep data structures
     );
 
     my $perl_string_hash_or_arrayref = $to_json->json_schema_to_json(
@@ -49,6 +50,12 @@ for things like OpenAPI specifications.
 You can set this to any key you like, although be careful as you could end up with
 invalid data being used (for example an integer field and then using the description
 key as the content would not be sensible or valid).
+
+## max\_depth
+
+To prevent deep recursion due to circular references in JSON schemas the module has
+a default max depth set to a very conservative level of 10. If you need to go deeper
+than this then pass a larger value at object construction.
 
 # METHODS
 

@@ -10,11 +10,13 @@ use String::Random;
 use DateTime;
 use Hash::Merge qw/ merge /;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 has _validator  => sub { JSON::Validator->new };
 has _str_rand   => sub { String::Random->new };
+has _depth      => sub { 0 };
 
+has max_depth   => sub { 10 };
 has example_key => sub { 0 };
 
 sub json_schema_to_json {
@@ -35,7 +37,10 @@ sub json_schema_to_json {
 	$self->_validator->schema( $schema );
 	$schema = $self->_validator->schema->data;
 
+	$self->_depth( $self->_depth + 1 );
 	my ( $method,$sub_schema ) = $self->_guess_method( $schema );
+	$self->_depth( $self->_depth - 1 ) if $self->_depth;
+
 	return $self->$method( $sub_schema );
 }
 
@@ -178,13 +183,24 @@ sub _random_array {
 			|| ( $schema->{minItems} ? $schema->{minItems} + 1 : 5 )
 	});
 
+	if ( $self->_depth >= $self->max_depth ) {
+		warn __PACKAGE__
+			. " hit max depth (@{[ $self->max_depth ]}) in _random_array";
+		return [ 1 .. $length ];
+	} else {
+		$self->_depth( $self->_depth + 1 );
+	}
+
 	my @return_items;
 
 	if ( my $items = $schema->{items} ) {
 
+		$self->_depth( $self->_depth + 1 );
+
 		if ( ref( $items ) eq 'ARRAY' ) {
 
 			ADD_ITEM: foreach my $item ( @{ $items } ) {
+				last ADD_ITEM if ( $self->_depth >= $self->max_depth );
 				$self->_add_next_array_item( \@return_items,$item,$unique )
 					|| redo ADD_ITEM; # possible halting problem
 			}
@@ -192,23 +208,35 @@ sub _random_array {
 		} else {
 
 			ADD_ITEM: foreach my $i ( 1 .. $length ) {
+				last ADD_ITEM if ( $self->_depth >= $self->max_depth );
 				$self->_add_next_array_item( \@return_items,$items,$unique )
 					|| redo ADD_ITEM; # possible halting problem
 			}
 
 		}
+
 	} else {
 		@return_items = 1 .. $length;
 	}
 
+	$self->_depth( $self->_depth - 1 ) if $self->_depth;
 	return [ @return_items ];
 }
 
 sub _add_next_array_item {
 	my ( $self,$array,$schema,$unique ) = @_;
 
+	if ( $self->_depth >= $self->max_depth ) {
+		warn __PACKAGE__
+			. " hit max depth (@{[ $self->max_depth ]}) in _add_next_array_item";
+		push( @{ $array },undef );
+		return 1;
+	}
+
+	$self->_depth( $self->_depth + 1 );
 	my ( $method,$sub_schema ) = $self->_guess_method( $schema );
 	my $value = $self->$method( $sub_schema );
+	$self->_depth( $self->_depth - 1 ) if $self->_depth;
 
 	if ( ! $unique ) {
 		push( @{ $array },$value );
@@ -282,12 +310,27 @@ sub _random_object {
 		}
 	}
 
-	foreach my $property ( keys %properties ) {
+	if ( $self->_depth >= $self->max_depth ) {
+		warn __PACKAGE__
+			. " hit max depth (@{[ $self->max_depth ]}) in _random_object";
+		return {};
+	} else {
+		$self->_depth( $self->_depth + 1 );
+	}
+
+	PROPERTY: foreach my $property ( keys %properties ) {
+
+		$self->_depth( $self->_depth + 1 );
+
+		last PROPERTY if ( $self->_depth >= $self->max_depth );
 
 		my ( $method,$sub_schema )
 			= $self->_guess_method( $schema->{properties}{$property} );
+
 		$object->{$property} = $self->$method( $sub_schema );
 	}
+
+	$self->_depth( $self->_depth - 1 ) if $self->_depth;
 
 	return $object;
 }
@@ -367,6 +410,7 @@ sub _guess_method {
 
 	$schema_type //= 'null';
 
+	$self->_depth( $self->_depth - 1 ) if $self->_depth;
 	return ( "_random_$schema_type",$schema );
 }
 
@@ -383,7 +427,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.06
+0.07
 
 =head1 SYNOPSIS
 
@@ -391,6 +435,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
     my $to_json  = JSON::Schema::ToJSON->new(
         example_key => undef, # set to a key to take example from
+        max_depth   => 10,    # increase if you have very deep data structures
     );
 
     my $perl_string_hash_or_arrayref = $to_json->json_schema_to_json(
@@ -428,6 +473,12 @@ for things like OpenAPI specifications.
 You can set this to any key you like, although be careful as you could end up with
 invalid data being used (for example an integer field and then using the description
 key as the content would not be sensible or valid).
+
+=head2 max_depth
+
+To prevent deep recursion due to circular references in JSON schemas the module has
+a default max depth set to a very conservative level of 10. If you need to go deeper
+than this then pass a larger value at object construction.
 
 =head1 METHODS
 
