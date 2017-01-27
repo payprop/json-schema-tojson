@@ -8,8 +8,9 @@ use Cpanel::JSON::XS;
 use JSON::Validator;
 use String::Random;
 use DateTime;
+use Hash::Merge qw/ merge /;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 has _validator  => sub { JSON::Validator->new };
 has _str_rand   => sub { String::Random->new };
@@ -105,6 +106,9 @@ sub _random_number {
 
 	return $self->_example_from_spec( $schema )
 		if scalar $self->_example_from_spec( $schema );
+
+	return $self->_random_integer( $schema )
+		if ( $schema->{multipleOf} );
 
 	return $self->_random_integer( $schema ) + $self->_random_integer( $schema ) / 10;
 }
@@ -232,6 +236,11 @@ sub _random_object {
 	my $max = $schema->{maxProperties}
 		|| ( $schema->{minProperties} ? $schema->{minProperties} + 1 : undef );
 
+	if ( ! $min && ! $max ) {
+		# no min or max, just make use of all properties
+		%properties = map { $_ => 1 } keys( %{ $schema->{properties} } );
+	}
+
 	if ( $min && scalar( keys( %properties ) ) < $min ) {
 		# we have too few properties
 		if ( $max ) {
@@ -275,8 +284,13 @@ sub _random_object {
 
 sub _random_null { undef }
 
+sub _random_enum {
+	my ( $self,$schema ) = @_;
+	return $self->_random_element( $schema->{'enum'} );
+}
+
 sub _guess_method {
-	my ( $self,$schema,$recursed ) = @_;
+	my ( $self,$schema ) = @_;
 
 	if (
 		$schema->{'type'}
@@ -287,8 +301,55 @@ sub _guess_method {
 
 	# check for combining schemas
 	if ( my $any_of = $schema->{'anyOf'} ) {
+
+		# easy, pick a random sub schema
 		my $sub_schema = $self->_random_element( $any_of );
-		return $self->_guess_method( $sub_schema,1 );
+		return $self->_guess_method( $sub_schema );
+
+	} elsif ( my $all_of = $schema->{'allOf'} ) {
+
+		# easy? mush these all together and assume the schema doesn't
+		# contain any contradictory information. note the mushing
+		# together needs to be a little bit smart to prevent stomping
+		# on any duplicate keys (hence Hash::Merge)
+		my $merged_schema = {};
+
+		foreach my $sub_schema ( @{ $all_of } ) {
+			$merged_schema = merge( $merged_schema,$sub_schema );
+		}
+
+		return $self->_guess_method( $merged_schema );
+
+	} elsif ( my $one_of = $schema->{'oneOf'} ) {
+
+		# difficult - we need to generate data that validates against
+		# one and *only* one of the rules, so here we make a poor
+		# attempt and just go by the first rule
+		warn __PACKAGE__ . " encountered oneOf, see CAVEATS perldoc section";
+		return $self->_guess_method( $one_of->[0] );
+
+	} elsif ( my $not = $schema->{'not'} ) {
+
+		# well i don't like this, because by implication it means
+		# the data can be anything but the listed one so it seems
+		# very handwavy in some cases.
+		warn __PACKAGE__ . " encountered not, see CAVEATS perldoc section";
+
+		if ( my $not_type = $not->{'type'} ) {
+
+			my $type = {
+				"string"  => "integer",
+				"integer" => "string",
+				"number"  => "string",
+				"enum"    => "string",
+				"boolean" => "string",
+				"null"    => "integer",
+				"object"  => "string",
+				"array"   => "object",
+			}->{ $not_type };
+
+			return $self->_guess_method( { type => $type } );
+		}
 	}
 
 	# danger danger! accessing private method from elsewhere
@@ -312,7 +373,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.05
+0.06
 
 =head1 SYNOPSIS
 
@@ -373,30 +434,31 @@ Returns a randomly generated representative data structure that corresponds to t
 passed JSON schema. Can take either an already parsed JSON Schema or the raw JSON
 Schema string.
 
-=head1 BUGS, CAVEATS, AND GOTCHAS
-
-Bugs? Almost certainly.
+=head1 CAVEATS
 
 Caveats? The implementation is currently incomplete, this is a work in progress so
-using some of the more edge case JSON schema validation options will not generate
+using some of the more edge case JSON schema validation options may not generate
 representative JSON so they will not validate against the schema on a round trip.
 These include:
 
-    additionalItems
-    patternProperties
-    additionalProperties
-    dependencies
-    allOf
-    anyOf
-    oneOf
-    not
+    additionalItems - this is ignored
+
+    additionalProperties - this is also ignored
+
+    dependencies - this is *also* ignored, possible result of invalid JSON if used
+
+    oneOf - only the *first* schema from the oneOf list will be used (which means
+            that the data returned may be invalid against others in the list)
+
+    not - currently any not restrictions are ignored as these can be very hand wavy
+          but we will try a "best guess" in the case of "not" : { "type" : ... }
 
 It is also entirely possible to pass a schema that could never be validated, but
 will result in a generated structure anyway, example: an integer that has a "minimum"
 value of 2, "maximum" value of 4, and must be a "multipleOf" 5 - a nonsensical
 combination.
 
-Gotchas? The data generated is completely random, don't expect it to be the same
+Note that the data generated is completely random, don't expect it to be the same
 across runs or calls. The data is also meaningless in terms of what it represents
 such that an object property of "name" that is a string will be generated as, for
 example, "kj02@#fjs01je#$42wfjs" - The JSON generated is so you have a representative

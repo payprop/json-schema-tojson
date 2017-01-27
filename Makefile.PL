@@ -17,6 +17,7 @@ WriteMakefile(
         'String::Random'   => 0.29,
         'Mojolicious'      => '7.15',
         'DateTime'         => 0,
+        'Hash::Merge'      => 0,
     },
     TEST_REQUIRES => {
         'Test::Most'       => 0.31,
