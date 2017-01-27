@@ -4,7 +4,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 # VERSION
 
-0.05
+0.06
 
 # SYNOPSIS
 
@@ -23,8 +23,6 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 [JSON::Schema::ToJSON](https://metacpan.org/pod/JSON::Schema::ToJSON) is a class for generating "fake" or "example" JSON data
 structures from JSON Schema structures.
-
-Note this distribution is currently **EXPERIMENTAL** and subject to breaking changes.
 
 # CONSTRUCTOR ARGUMENTS
 
@@ -65,30 +63,44 @@ Returns a randomly generated representative data structure that corresponds to t
 passed JSON schema. Can take either an already parsed JSON Schema or the raw JSON
 Schema string.
 
-# BUGS, CAVEATS, AND GOTCHAS
+# CAVEATS
 
-Bugs? Almost certainly.
+Caveats? The implementation is incomplete as using some of the more edge case JSON
+schema validation options may not generate representative JSON so they will not
+validate against the schema on a round trip. These include:
 
-Caveats? The implementation is currently incomplete, this is a work in progress so
-using some of the more edge case JSON schema validation options will not generate
-representative JSON so they will not validate against the schema on a round trip.
-These include:
+- additionalItems
 
-    additionalItems
-    patternProperties
-    additionalProperties
-    dependencies
-    allOf
-    anyOf
-    oneOf
-    not
+    This is ignored
+
+- additionalProperties and patternProperties
+
+    These are also ignored
+
+- dependencies
+
+    This is \*also\* ignored, possible result of invalid JSON if used
+
+- oneOf
+
+    Only the \*first\* schema from the oneOf list will be used (which means
+    that the data returned may be invalid against others in the list)
+
+- not
+
+    Currently any not restrictions are ignored as these can be very hand wavy
+    but we will try a "best guess" in the case of "not" : { "type" : ... }
+
+In the case of oneOf and not the module will raise a warning to let you know that
+potentially invalid JSON has been generated. If you're using this module then you
+probably want to avoid oneOf and not in your schemas.
 
 It is also entirely possible to pass a schema that could never be validated, but
 will result in a generated structure anyway, example: an integer that has a "minimum"
 value of 2, "maximum" value of 4, and must be a "multipleOf" 5 - a nonsensical
 combination.
 
-Gotchas? The data generated is completely random, don't expect it to be the same
+Note that the data generated is completely random, don't expect it to be the same
 across runs or calls. The data is also meaningless in terms of what it represents
 such that an object property of "name" that is a string will be generated as, for
 example, "kj02@#fjs01je#$42wfjs" - The JSON generated is so you have a representative

@@ -1,5 +1,10 @@
 Revision history for JSON-Schema-ToJSON
 
+0.06  2017-01-27
+        - Add support for anyOf, allOf, oneOf, and not (with Caveats, see perldoc)
+        - Improve randomness of generated date-time and uri strings
+        - Remove EXPERIMENTAL status
+
 0.05  2017-01-26
         - Fix perldoc
 

@@ -128,7 +128,13 @@ sub _random_string {
 
 	if ( my $format = $schema->{format} ) {
 		return {
-			"date-time" => DateTime->now->iso8601 . '.000Z',
+			"date-time" => DateTime->now->subtract(
+				weeks => $self->_random_integer({ minimum => 1, maximum => 500 }),
+				days => $self->_random_integer({ minimum => 1 }),
+				hours => $self->_random_integer({ minimum => 1 }),
+				minutes => $self->_random_integer({ minimum => 1 }),
+				seconds => $self->_random_integer({ minimum => 1 }),
+			)->iso8601 . '.000Z',
 			"email"     =>
 				$self->_random_string( { pattern => '[A-Za-z]{12}' } )
 				. '@'
@@ -140,8 +146,12 @@ sub _random_string {
 				maximum => 254,
 			}) } 1 .. 4 ),
 			"ipv6"      => '2001:0db8:0000:0000:0000:0000:1428:57ab',
-			"uri"       => 'https://www.google.com',
-			"uriref"    => 'https://www.google.com',
+			"uri"       => 'https://www.'
+				. $self->_random_string( { pattern => '[a-z]{12}' } )
+				. '.com',
+			"uriref"    => 'https://www.'
+				. $self->_random_string( { pattern => '[a-z]{12}' } )
+				. '.com',
 		}->{ $format };
 	}
 
@@ -330,11 +340,6 @@ sub _guess_method {
 
 	} elsif ( my $not = $schema->{'not'} ) {
 
-		# well i don't like this, because by implication it means
-		# the data can be anything but the listed one so it seems
-		# very handwavy in some cases.
-		warn __PACKAGE__ . " encountered not, see CAVEATS perldoc section";
-
 		if ( my $not_type = $not->{'type'} ) {
 
 			my $type = {
@@ -350,6 +355,11 @@ sub _guess_method {
 
 			return $self->_guess_method( { type => $type } );
 		}
+
+		# well i don't like this, because by implication it means
+		# the data can be anything but the listed one so it seems
+		# very handwavy in some cases.
+		warn __PACKAGE__ . " encountered not, see CAVEATS perldoc section";
 	}
 
 	# danger danger! accessing private method from elsewhere
@@ -393,8 +403,6 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 L<JSON::Schema::ToJSON> is a class for generating "fake" or "example" JSON data
 structures from JSON Schema structures.
 
-Note this distribution is currently B<EXPERIMENTAL> and subject to breaking changes.
-
 =head1 CONSTRUCTOR ARGUMENTS
 
 =head2 example_key
@@ -436,22 +444,39 @@ Schema string.
 
 =head1 CAVEATS
 
-Caveats? The implementation is currently incomplete, this is a work in progress so
-using some of the more edge case JSON schema validation options may not generate
-representative JSON so they will not validate against the schema on a round trip.
-These include:
+Caveats? The implementation is incomplete as using some of the more edge case JSON
+schema validation options may not generate representative JSON so they will not
+validate against the schema on a round trip. These include:
 
-    additionalItems - this is ignored
+=over 4
 
-    additionalProperties - this is also ignored
+=item * additionalItems
 
-    dependencies - this is *also* ignored, possible result of invalid JSON if used
+This is ignored
 
-    oneOf - only the *first* schema from the oneOf list will be used (which means
-            that the data returned may be invalid against others in the list)
+=item * additionalProperties and patternProperties
 
-    not - currently any not restrictions are ignored as these can be very hand wavy
-          but we will try a "best guess" in the case of "not" : { "type" : ... }
+These are also ignored
+
+=item * dependencies
+
+This is *also* ignored, possible result of invalid JSON if used
+
+=item * oneOf
+
+Only the *first* schema from the oneOf list will be used (which means
+that the data returned may be invalid against others in the list)
+
+=item * not
+
+Currently any not restrictions are ignored as these can be very hand wavy
+but we will try a "best guess" in the case of "not" : { "type" : ... }
+
+=back
+
+In the case of oneOf and not the module will raise a warning to let you know that
+potentially invalid JSON has been generated. If you're using this module then you
+probably want to avoid oneOf and not in your schemas.
 
 It is also entirely possible to pass a schema that could never be validated, but
 will result in a generated structure anyway, example: an integer that has a "minimum"
