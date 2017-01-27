@@ -10,6 +10,7 @@ t/005_simple.t
 t/006_array.t
 t/007_object.t
 t/008_ref.t
+t/010_combining_schema.t
 t/020_round_trip.t
 t/021_example_key.t
 t/030_json_schema.t

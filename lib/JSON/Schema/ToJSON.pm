@@ -34,8 +34,8 @@ sub json_schema_to_json {
 	$self->_validator->schema( $schema );
 	$schema = $self->_validator->schema->data;
 
-	my $method = $self->_guess_method( $schema );
-	return $self->$method( $schema );
+	my ( $method,$sub_schema ) = $self->_guess_method( $schema );
+	return $self->$method( $sub_schema );
 }
 
 sub _example_from_spec {
@@ -77,7 +77,7 @@ sub _random_integer {
 	my @possible_values = defined $min && defined $max
 		? $min .. $max
 		: defined $min
-			? $min .. $min + ( $min * $min )
+			? $min .. $min + 1000
 			: defined $max
 				? 1 .. $max
 				: defined $mof
@@ -96,7 +96,7 @@ sub _random_integer {
 		);
 		return $possible_values[0];
 	} else {
-		return $possible_values[ int( rand( $#possible_values + 1 ) ) ];
+		return $self->_random_element( [ @possible_values ] );
 	}
 }
 
@@ -116,7 +116,7 @@ sub _random_string {
 		if scalar $self->_example_from_spec( $schema );
 
 	if ( my @enum = @{ $schema->{enum} // [] } ) {
-		return $enum[ int( rand( $#enum + 1 ) ) ];
+		return $self->_random_element( [ @enum ] );
 	}
 
 	return $self->_str_rand->randregex( $schema->{pattern} )
@@ -193,8 +193,8 @@ sub _random_array {
 sub _add_next_array_item {
 	my ( $self,$array,$schema,$unique ) = @_;
 
-	my $method = $self->_guess_method( $schema );
-	my $value = $self->$method( $schema );
+	my ( $method,$sub_schema ) = $self->_guess_method( $schema );
+	my $value = $self->$method( $sub_schema );
 
 	if ( ! $unique ) {
 		push( @{ $array },$value );
@@ -265,8 +265,9 @@ sub _random_object {
 
 	foreach my $property ( keys %properties ) {
 
-		my $method = $self->_guess_method( $schema->{properties}{$property} );
-		$object->{$property} = $self->$method( $schema->{properties}{$property} );
+		my ( $method,$sub_schema )
+			= $self->_guess_method( $schema->{properties}{$property} );
+		$object->{$property} = $self->$method( $sub_schema );
 	}
 
 	return $object;
@@ -275,17 +276,32 @@ sub _random_object {
 sub _random_null { undef }
 
 sub _guess_method {
-	my ( $self,$schema ) = @_;
+	my ( $self,$schema,$recursed ) = @_;
 
-	if ( ref( $schema->{'type'} ) eq 'ARRAY' ) {
-		$schema->{'type'} = $schema->{'type'}->[
-			int( rand( scalar( @{ $schema->{'type'} } ) ) )
-		];
+	if (
+		$schema->{'type'}
+		&& ref( $schema->{'type'} ) eq 'ARRAY'
+	) {
+		$schema->{'type'} = $self->_random_element( $schema->{'type'} );
+	}
+
+	# check for combining schemas
+	if ( my $any_of = $schema->{'anyOf'} ) {
+		my $sub_schema = $self->_random_element( $any_of );
+		return $self->_guess_method( $sub_schema,1 );
 	}
 
 	# danger danger! accessing private method from elsewhere
-	my $schema_type = JSON::Validator::_guess_schema_type( $schema ) // 'null';
-	return "_random_$schema_type";
+	my $schema_type = JSON::Validator::_guess_schema_type( $schema );
+
+	$schema_type //= 'null';
+
+	return ( "_random_$schema_type",$schema );
+}
+
+sub _random_element {
+	my ( $self,$list ) = @_;
+	return $list->[ int( rand( scalar( @{ $list } ) ) ) ];
 }
 
 =encoding utf8
