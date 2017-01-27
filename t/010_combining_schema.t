@@ -112,7 +112,7 @@ $json = $ToJSON->json_schema_to_json(
     schema => $schema,
 );
 
-unlike( $json,qr/^\d+/,'not (type)' );
+unlike( $json,qr/^\d+$/,'not (type)' );
 
 done_testing();
 
