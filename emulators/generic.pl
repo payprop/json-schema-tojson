@@ -1,40 +1,31 @@
 #!perl
 
-package main;
-
-use strict;
-use warnings;
-
-use Mojolicious::Lite;
+use Mojolicious::Lite; # "strict", "warnings", "utf8" and Perl 5.10 features
 use JSON::Schema::ToJSON;
 
-my $spec_uri = shift || die "Need a spec URI: $0 <spec_uri> <base_path>";
-my $base     = shift || die "Need base path: $0 <spec_uri> <base_path>";
-
-my $api = app->routes->under( $base )->to( cb => sub {
-	my ( $c ) = @_;
-	return 1;
-} );
+my $spec_uri    = shift || die "Need a spec URI: $0 <spec_uri> <base_path> [<example_key>]";
+my $base        = shift || die "Need base path: $0 <spec_uri> <base_path> [<example_key>]";
+my $example_key = shift;
 
 plugin OpenAPI => {
-	route => $api,
-	url   => $spec_uri
+	route => app->routes->under( $base )->to( cb => sub { 1; } ),
+	url   => $spec_uri,
 };
 
 app->helper( 'openapi.not_implemented' => sub {
-	my ( $c ) = @_;
 
-	my $spec = $c->openapi->spec;
+	if ( my $responses = shift->openapi->spec->{'responses'} ) {
+		if ( my ( $response ) = grep { /^2/ } sort keys( %{$responses} ) ) {
 
-	if (my ($response) = grep { /^2/ } sort keys(%{$spec->{'responses'}})) {
-
-		my $ret = $spec->{'responses'}{$response}{description} // '';
-		if ( my $schema = $spec->{'responses'}{$response}{schema} ) {
-			$ret = JSON::Schema::ToJSON->new->json_schema_to_json(
-				schema => $schema
-			);
+			my $ret = $responses->{$response}{description} // '';
+			if ( my $schema = $responses->{$response}{schema} ) {
+				$ret = JSON::Schema::ToJSON->new->json_schema_to_json(
+					schema      => $schema,
+					example_key => $example_key,
+				);
+			}
+			return ($ret,$response);
 		}
-		return ($ret,$response);
 	}
 
 	return ({errors => [{message => 'Not implemented.', path => '/'}]}, 501);
