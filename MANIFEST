@@ -3,6 +3,8 @@ MANIFEST
 Makefile.PL
 README.md
 README.pod
+emulators/cpanfile
+emulators/generic.pl
 lib/JSON/Schema/ToJSON.pm
 t/001_compiles_pod.t
 t/003_changes.t

@@ -10,7 +10,7 @@ use String::Random;
 use DateTime;
 use Hash::Merge qw/ merge /;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 has _validator  => sub { JSON::Validator->new };
 has _str_rand   => sub { String::Random->new };
@@ -427,7 +427,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.07
+0.08
 
 =head1 SYNOPSIS
 
