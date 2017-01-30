@@ -24,11 +24,14 @@ app->helper( 'openapi.not_implemented' => sub {
 					example_key => $example_key,
 				);
 			}
-			return ($ret,$response);
+			return {json => $ret, status => $response};
 		}
 	}
 
-	return ({errors => [{message => 'Not implemented.', path => '/'}]}, 501);
+	return {
+		status => 501,
+		json   => {errors => [{message => 'Not implemented.', path => '/'}]}
+	};
 });
 
 
