@@ -43,7 +43,7 @@ eval {
 
 like(
 	$@,
-	qr!Could not find "#/definitions/doesNotExist!,
+	qr!Could not find.*?#/definitions/doesNotExist!,
 	'die on bad $ref',
 );
 
