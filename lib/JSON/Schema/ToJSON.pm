@@ -10,7 +10,7 @@ use String::Random;
 use DateTime;
 use Hash::Merge qw/ merge /;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 has _validator  => sub { JSON::Validator->new };
 has _str_rand   => sub { String::Random->new };
@@ -405,8 +405,12 @@ sub _guess_method {
 		warn __PACKAGE__ . " encountered not, see CAVEATS perldoc section";
 	}
 
-	# danger danger! accessing private method from elsewhere
-	my $schema_type = JSON::Validator::_guess_schema_type( $schema );
+	# danger danger! accessing private method from elsewhere. note enum was
+	# removed from _guess_data_type in JSON::Validator
+	# f290618f621a36db8f5010f8b99a42170dac820a so need to check for it here
+	my $schema_type = $schema->{enum}
+		? 'enum'
+		: JSON::Validator::_guess_schema_type( $schema );
 
 	$schema_type //= 'null';
 
@@ -427,7 +431,7 @@ JSON::Schema::ToJSON - Generate example JSON structures from JSON Schema definit
 
 =head1 VERSION
 
-0.11
+0.12
 
 =head1 SYNOPSIS
 
