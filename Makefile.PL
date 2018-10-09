@@ -29,7 +29,7 @@ WriteMakefile(
     META_MERGE => {
         resources => {
             license    => 'http://dev.perl.org/licenses/',
-            homepage   => 'https://metacpan.org/module/JSON::Schame::ToJSON',
+            homepage   => 'https://metacpan.org/module/JSON::Schema::ToJSON',
             bugtracker => 'https://github.com/Humanstate/json-schema-tojson/issues',
             repository => 'https://github.com/Humanstate/json-schema-tojson'
         },
